@@ -122,7 +122,6 @@ function updateTimerDisplay() {
             els.mainDisplay.textContent = "00:00";
             els.mainDisplay.style.color = "var(--danger-color)";
             els.subDisplay.textContent = "Feed Overdue";
-            // Trigger alarm logic if exactly hitting 0 happens in background (handled largely by notifications)
         } else {
             els.mainDisplay.textContent = formatMs(diff);
             els.mainDisplay.style.color = "var(--text-primary)";
@@ -142,8 +141,8 @@ function updateTimerDisplay() {
 
 let alarmTriggered = false;
 function checkAlarm(diff) {
-    // Trigger alarm if we cross the 0 threshold (approx) and haven't triggered yet
-    if (diff <= 0 && diff > -5000 && !alarmTriggered) {
+    // FIX 1: Increased window to -60000 (60 seconds) to handle mobile background throttling
+    if (diff <= 0 && diff > -60000 && !alarmTriggered) {
         alarmTriggered = true;
         sendNotification();
         playChime(state.settings.sound);
@@ -314,6 +313,19 @@ function applyTheme() {
 // This removes dependency on external MP3 files
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioCtx = new AudioContext();
+
+// FIX 2: Unlock audio on first user interaction (Autoplay Policy Fix)
+function unlockAudio() {
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+            document.body.removeEventListener('click', unlockAudio);
+            document.body.removeEventListener('touchstart', unlockAudio);
+        });
+    }
+}
+// Add listeners to body to capture first tap anywhere
+document.body.addEventListener('click', unlockAudio);
+document.body.addEventListener('touchstart', unlockAudio);
 
 function playChime(type) {
     if(audioCtx.state === 'suspended') audioCtx.resume();
