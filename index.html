@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1e1e2e">
+    <meta name="description" content="A calming newborn feeding timer and tracker.">
+    <title>Nurture | Newborn Feeding Timer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+
+    <header class="app-header">
+        <div id="live-clock" class="live-clock">00:00</div>
+        <button id="btn-settings" aria-label="Settings">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+    </header>
+
+    <main id="view-home" class="active-view">
+        <div class="timer-container">
+            <div class="timer-toggle">
+                <button id="toggle-countdown" class="active">Next Feed</button>
+                <button id="toggle-stopwatch">Since Last</button>
+            </div>
+            
+            <div id="main-display" class="main-display">--:--</div>
+            <div id="sub-display" class="sub-display">Due at --:--</div>
+
+            <div id="encouragement" class="encouragement">You're doing a great job!</div>
+
+            <button id="btn-start-feed" class="btn-primary">Start Feed</button>
+        </div>
+
+        <section class="history-preview">
+            <div class="section-header">
+                <h3>Recent Feeds</h3>
+                <button id="btn-view-stats" class="text-link">History & Stats</button>
+            </div>
+            <ul id="feed-list-preview" class="feed-list">
+                </ul>
+        </section>
+    </main>
+
+    <div id="view-stats" class="view-modal hidden">
+        <div class="modal-header">
+            <h2>History & Stats</h2>
+            <button class="btn-close" onclick="showView('home')">Close</button>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-label">Last 24h</span>
+                <span id="stat-count-24" class="stat-value">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Avg Interval</span>
+                <span id="stat-avg-time" class="stat-value">--</span>
+            </div>
+        </div>
+        <button id="btn-export" class="btn-secondary" style="margin: 1rem 0; width: 100%;">Export Data (JSON)</button>
+        <ul id="feed-list-full" class="feed-list"></ul>
+    </div>
+
+    <div id="view-settings" class="view-modal hidden">
+        <div class="modal-header">
+            <h2>Settings</h2>
+            <button class="btn-close" onclick="showView('home')">Close</button>
+        </div>
+        <div class="settings-form">
+            <label>
+                Feed Interval
+                <select id="setting-interval">
+                    <option value="120">2 Hours</option>
+                    <option value="150" selected>2.5 Hours</option>
+                    <option value="180">3 Hours</option>
+                    <option value="240">4 Hours</option>
+                </select>
+            </label>
+
+            <label>
+                Theme
+                <select id="setting-theme">
+                    <option value="dark">Dark (Default)</option>
+                    <option value="light">Light</option>
+                </select>
+            </label>
+
+            <label>
+                Alarm Sound
+                <select id="setting-sound">
+                    <option value="chime1">Soft Chime</option>
+                    <option value="chime2">Gentle Bell</option>
+                    <option value="chime3">Harp</option>
+                </select>
+            </label>
+
+            <button id="btn-test-sound" class="btn-small">Test Sound</button>
+            
+            <hr>
+            
+            <button id="btn-clear-data" class="btn-danger">Clear All Data</button>
+        </div>
+    </div>
+
+    <div id="modal-edit" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>Edit Feed</h3>
+            <input type="hidden" id="edit-id">
+            
+            <label>Time</label>
+            <input type="datetime-local" id="edit-time">
+
+            <label>Type</label>
+            <div class="chip-group" id="edit-type-group">
+                <button class="chip" data-val="Left">Left</button>
+                <button class="chip" data-val="Right">Right</button>
+                <button class="chip" data-val="Bottle">Bottle</button>
+                <button class="chip" data-val="Formula">Formula</button>
+            </div>
+            <input type="hidden" id="edit-type">
+
+            <label>Amount (ml) - Optional</label>
+            <input type="number" id="edit-amount" placeholder="ml">
+
+            <label>Notes</label>
+            <textarea id="edit-notes" rows="2"></textarea>
+
+            <div class="modal-actions">
+                <button id="btn-delete-entry" class="btn-danger-text">Delete</button>
+                <div class="right-actions">
+                    <button class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+                    <button id="btn-save-entry" class="btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
