@@ -1,10 +1,11 @@
 {
-    "name": "Newborn Feeding Timer",
-    "short_name": "Newborn",
-    "start_url": ".",
+    "name": "Nurture Feed Timer",
+    "short_name": "Nurture",
+    "start_url": "./index.html",
     "display": "standalone",
-    "background_color": "#F5F5F7",
-    "theme_color": "#007AFF",
+    "background_color": "#1e1e2e",
+    "theme_color": "#1e1e2e",
+    "orientation": "portrait",
     "icons": [
         {
             "src": "icons/icon-192.png",
