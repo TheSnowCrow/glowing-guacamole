@@ -1,12 +1,11 @@
-const CACHE_NAME = 'newborn-timer-v1';
+const CACHE_NAME = 'nurture-v1';
 const ASSETS = [
-    '/',
-    '/index.html',
-    '/styles.css',
-    '/app.js',
-    '/manifest.json',
-    '/icons/icon-192.png',
-    '/icons/icon-512.png'
+    './',
+    './index.html',
+    './styles.css',
+    './app.js',
+    './manifest.json'
+    // Icons are cached dynamically if accessed
 ];
 
 self.addEventListener('install', (e) => {
@@ -17,6 +16,8 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('fetch', (e) => {
     e.respondWith(
-        caches.match(e.request).then((response) => response || fetch(e.request))
+        caches.match(e.request).then((response) => {
+            return response || fetch(e.request);
+        })
     );
 });
