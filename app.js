@@ -121,7 +121,7 @@ function updateTimerDisplay() {
             // Overdue
             els.mainDisplay.textContent = "00:00";
             els.mainDisplay.style.color = "var(--danger-color)";
-            els.subDisplay.textContent = "Feed Overdue";
+            els.subDisplay.textContent = "Time to Feed";
             // Trigger alarm logic if exactly hitting 0 happens in background (handled largely by notifications)
         } else {
             els.mainDisplay.textContent = formatMs(diff);
