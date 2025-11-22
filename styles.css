@@ -1,0 +1,224 @@
+:root {
+    --bg-color: #1e1e2e;
+    --surface-color: #313244;
+    --text-primary: #cdd6f4;
+    --text-secondary: #a6adc8;
+    --accent-color: #89b4fa; /* Blue */
+    --accent-secondary: #cba6f7; /* Purple */
+    --danger-color: #f38ba8;
+    --success-color: #a6e3a1;
+    --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --radius: 16px;
+}
+
+[data-theme="light"] {
+    --bg-color: #eff1f5;
+    --surface-color: #ffffff;
+    --text-primary: #4c4f69;
+    --text-secondary: #6c6f85;
+    --accent-color: #1e66f5;
+    --accent-secondary: #8839ef;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Prevent pull-to-refresh usually */
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Typography & Utils */
+.hidden { display: none !important; }
+button { font-family: inherit; border: none; cursor: pointer; outline: none; }
+
+/* Header */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    padding-top: max(1rem, env(safe-area-inset-top));
+}
+
+.live-clock { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+#btn-settings { background: none; color: var(--text-secondary); padding: 8px; }
+
+/* Main Layout */
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 1.5rem;
+    overflow-y: auto;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* Timer Container */
+.timer-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 2rem;
+    flex-shrink: 0;
+}
+
+.timer-toggle {
+    background: var(--surface-color);
+    border-radius: 20px;
+    padding: 4px;
+    display: flex;
+    margin-bottom: 2rem;
+}
+
+.timer-toggle button {
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 8px 16px;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.timer-toggle button.active {
+    background: var(--accent-color);
+    color: var(--bg-color); /* Contrast against accent */
+}
+
+[data-theme="light"] .timer-toggle button.active { color: white; }
+
+.main-display {
+    font-size: 4.5rem;
+    font-weight: 200;
+    letter-spacing: -2px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.sub-display {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+}
+
+.encouragement {
+    color: var(--accent-secondary);
+    font-size: 1rem;
+    margin-bottom: 2rem;
+    font-weight: 500;
+    min-height: 1.5em;
+    opacity: 0.9;
+}
+
+/* Buttons */
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent-color), var(--accent-secondary));
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 600;
+    padding: 1rem 3rem;
+    border-radius: 30px;
+    width: 100%;
+    max-width: 300px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: transform 0.1s;
+}
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-secondary {
+    background: var(--surface-color);
+    color: var(--text-primary);
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.btn-danger { background: var(--danger-color); color: white; padding: 12px; border-radius: 12px; width: 100%; margin-top: 1rem;}
+.btn-danger-text { background: transparent; color: var(--danger-color); font-weight: 600; }
+.text-link { background: none; color: var(--accent-color); font-weight: 500; font-size: 0.9rem;}
+
+/* Feed List */
+.history-preview { flex: 1; }
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.section-header h3 { font-size: 1.2rem; font-weight: 600; }
+
+.feed-list { list-style: none; padding-bottom: 2rem; }
+.feed-item {
+    background: var(--surface-color);
+    padding: 1rem;
+    border-radius: var(--radius);
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.feed-info h4 { font-size: 1rem; margin-bottom: 0.25rem; }
+.feed-info p { font-size: 0.85rem; color: var(--text-secondary); }
+.feed-edit-btn { background: var(--bg-color); color: var(--text-secondary); padding: 6px 12px; border-radius: 8px; font-size: 0.8rem;}
+
+/* Views / Modals */
+.view-modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: var(--bg-color);
+    z-index: 100;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease-out;
+}
+
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.btn-close { font-size: 1rem; color: var(--accent-color); font-weight: 600; background: none; }
+
+/* Stats Grid */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
+.stat-card { background: var(--surface-color); padding: 1.5rem; border-radius: var(--radius); text-align: center; }
+.stat-label { display: block; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem; }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent-color); }
+
+/* Forms */
+.settings-form label, .modal-content label { display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.9rem; margin-top: 1rem; }
+select, input, textarea {
+    width: 100%; background: var(--surface-color); border: 1px solid transparent;
+    color: var(--text-primary); padding: 12px; border-radius: 12px;
+    font-size: 1rem; font-family: inherit;
+}
+select:focus, input:focus { border-color: var(--accent-color); outline: none; }
+
+/* Edit Modal Overlay */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+}
+.modal-content {
+    background: var(--bg-color); width: 90%; max-width: 400px;
+    padding: 1.5rem; border-radius: 24px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+.modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; }
+.right-actions { display: flex; gap: 0.5rem; }
+
+/* Chips */
+.chip-group { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.chip {
+    background: var(--surface-color); color: var(--text-secondary);
+    padding: 8px 16px; border-radius: 20px; white-space: nowrap; border: 1px solid transparent;
+}
+.chip.selected { background: rgba(137, 180, 250, 0.2); color: var(--accent-color); border-color: var(--accent-color); }
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
