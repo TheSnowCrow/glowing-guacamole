@@ -1,383 +1,438 @@
-// State & Configuration
-const state = {
+/**
+ * Nurture PWA Logic
+ * Stores data in localStorage under 'nurture_data'
+ */
+
+// --- State Management ---
+let state = {
     feeds: [],
-    lastFeed: null,
     settings: {
-        theme: 'blue',
-        darkMode: false,
-        intervalHours: 2
+        intervalMinutes: 150, // 2.5 hours
+        theme: 'dark',
+        sound: 'chime1'
     },
     viewMode: 'countdown' // 'countdown' or 'stopwatch'
 };
 
-// DOM Elements
+// --- DOM Elements ---
 const els = {
     clock: document.getElementById('live-clock'),
-    mainTimer: document.getElementById('main-timer'),
-    timerLabel: document.getElementById('timer-label'),
-    btnStart: document.getElementById('btn-start-feed'),
+    mainDisplay: document.getElementById('main-display'),
+    subDisplay: document.getElementById('sub-display'),
+    encouragement: document.getElementById('encouragement'),
     feedListPreview: document.getElementById('feed-list-preview'),
     feedListFull: document.getElementById('feed-list-full'),
-    views: document.querySelectorAll('main'),
-    navBtns: document.querySelectorAll('.nav-item'),
-    modeBtns: document.querySelectorAll('.toggle-btn'),
-    encouragement: document.getElementById('encouragement'),
-    modal: document.getElementById('feed-modal'),
-    form: document.getElementById('feed-form')
+    toggleCountdown: document.getElementById('toggle-countdown'),
+    toggleStopwatch: document.getElementById('toggle-stopwatch'),
+    startBtn: document.getElementById('btn-start-feed'),
+    btnSettings: document.getElementById('btn-settings'),
+    btnStats: document.getElementById('btn-view-stats'),
+    views: {
+        home: document.getElementById('view-home'),
+        stats: document.getElementById('view-stats'),
+        settings: document.getElementById('view-settings')
+    },
+    inputs: {
+        theme: document.getElementById('setting-theme'),
+        interval: document.getElementById('setting-interval'),
+        sound: document.getElementById('setting-sound')
+    },
+    modal: {
+        overlay: document.getElementById('modal-edit'),
+        time: document.getElementById('edit-time'),
+        typeGroup: document.getElementById('edit-type-group'),
+        typeInput: document.getElementById('edit-type'),
+        amount: document.getElementById('edit-amount'),
+        notes: document.getElementById('edit-notes'),
+        id: document.getElementById('edit-id'),
+        saveBtn: document.getElementById('btn-save-entry'),
+        delBtn: document.getElementById('btn-delete-entry')
+    }
 };
 
 const messages = [
-    "You're doing great!", "One feed at a time.", "Super parent mode: ON",
-    "Breathe. You got this.", "Doing it for the little one!", "Looking good!",
-    "Champion of the bottle!", "Master of the milk!"
+    "You're doing great!", "One feed at a time.", "You got this!",
+    "Deep breaths.", "Remember to hydrate.", "Super parent mode: ON",
+    "Doing an amazing job.", "Love grows here."
 ];
 
 // --- Initialization ---
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
     loadData();
+    applyTheme();
     setupEventListeners();
+    startClock();
+    renderFeeds();
+    updateTimerDisplay();
     requestNotificationPermission();
-    setInterval(updateClock, 1000);
-    setInterval(updateTimer, 1000);
-    updateClock();
-    updateUI();
-});
+    
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./service-worker.js');
+    }
+}
 
-// --- Core Logic ---
-
+// --- Data Persistence ---
 function loadData() {
-    const savedState = localStorage.getItem('newbornTimerState');
-    if (savedState) {
-        const parsed = JSON.parse(savedState);
+    const stored = localStorage.getItem('nurture_data');
+    if (stored) {
+        const parsed = JSON.parse(stored);
         state.feeds = parsed.feeds || [];
         state.settings = { ...state.settings, ...parsed.settings };
-        state.lastFeed = state.feeds.length > 0 ? state.feeds[0].start : null;
     }
-    applyTheme();
+    // Sync settings UI
+    els.inputs.theme.value = state.settings.theme;
+    els.inputs.interval.value = state.settings.intervalMinutes;
+    els.inputs.sound.value = state.settings.sound;
 }
 
 function saveData() {
-    localStorage.setItem('newbornTimerState', JSON.stringify({
+    localStorage.setItem('nurture_data', JSON.stringify({
         feeds: state.feeds,
         settings: state.settings
     }));
-    updateUI();
 }
 
-function startFeed() {
-    const now = new Date().getTime();
-    const newFeed = {
-        id: now,
-        start: now,
-        end: null,
-        type: 'breast-l', // Default
-        amount: null,
-        brand: '',
-        notes: ''
-    };
-    
-    state.feeds.unshift(newFeed);
-    state.lastFeed = now;
-    
-    // Rotate encouragement
-    els.encouragement.textContent = messages[Math.floor(Math.random() * messages.length)];
-    
-    saveData();
-    scheduleNotification();
+// --- Timer Logic ---
+function startClock() {
+    setInterval(() => {
+        const now = new Date();
+        els.clock.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        updateTimerDisplay();
+    }, 1000);
 }
 
-// --- Timer Functions ---
-
-function updateClock() {
-    const now = new Date();
-    els.clock.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function updateTimer() {
-    if (!state.lastFeed) {
-        els.mainTimer.textContent = "00:00:00";
+function updateTimerDisplay() {
+    if (state.feeds.length === 0) {
+        els.mainDisplay.textContent = "--:--";
+        els.subDisplay.textContent = "No feeds recorded yet";
         return;
     }
 
-    const now = new Date().getTime();
-    const diff = now - state.lastFeed;
-    const intervalMs = state.settings.intervalHours * 60 * 60 * 1000;
+    const lastFeed = state.feeds[0]; // Feeds are sorted DESC
+    const lastTime = new Date(lastFeed.timestamp).getTime();
+    const now = Date.now();
+    const intervalMs = state.settings.intervalMinutes * 60 * 1000;
+    const nextFeedTime = lastTime + intervalMs;
 
-    if (state.viewMode === 'stopwatch') {
-        els.mainTimer.textContent = formatDuration(diff);
-        els.timerLabel.textContent = "Time since last feed";
-    } else {
-        // Countdown
-        const remaining = intervalMs - diff;
-        if (remaining < 0) {
-            els.mainTimer.textContent = "-" + formatDuration(Math.abs(remaining));
-            els.timerLabel.textContent = "Overdue by";
-            els.mainTimer.style.color = "var(--danger)";
+    if (state.viewMode === 'countdown') {
+        const diff = nextFeedTime - now;
+        
+        if (diff <= 0) {
+            // Overdue
+            els.mainDisplay.textContent = "00:00";
+            els.mainDisplay.style.color = "var(--danger-color)";
+            els.subDisplay.textContent = "Feed Overdue";
+            // Trigger alarm logic if exactly hitting 0 happens in background (handled largely by notifications)
         } else {
-            els.mainTimer.textContent = formatDuration(remaining);
-            els.timerLabel.textContent = "Until next feed";
-            els.mainTimer.style.color = "var(--text-main)";
+            els.mainDisplay.textContent = formatMs(diff);
+            els.mainDisplay.style.color = "var(--text-primary)";
+            els.subDisplay.textContent = `Due at ${new Date(nextFeedTime).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`;
         }
+        
+        checkAlarm(diff);
+
+    } else {
+        // Stopwatch
+        const diff = now - lastTime;
+        els.mainDisplay.textContent = formatMs(diff);
+        els.mainDisplay.style.color = "var(--text-primary)";
+        els.subDisplay.textContent = `Last feed: ${new Date(lastTime).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`;
     }
 }
 
-function formatDuration(ms) {
-    const seconds = Math.floor((ms / 1000) % 60);
-    const minutes = Math.floor((ms / (1000 * 60)) % 60);
-    const hours = Math.floor((ms / (1000 * 60 * 60)));
-    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+let alarmTriggered = false;
+function checkAlarm(diff) {
+    // Trigger alarm if we cross the 0 threshold (approx) and haven't triggered yet
+    if (diff <= 0 && diff > -5000 && !alarmTriggered) {
+        alarmTriggered = true;
+        sendNotification();
+        playChime(state.settings.sound);
+    }
+    // Reset alarm trigger if user adds a feed
+    if (diff > 0) alarmTriggered = false;
 }
 
-function pad(num) {
-    return num.toString().padStart(2, '0');
+function formatMs(ms) {
+    const totalSeconds = Math.floor(Math.abs(ms) / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+    return `${m}:${pad(s)}`;
 }
 
-// --- UI Updates ---
+function pad(num) { return num.toString().padStart(2, '0'); }
 
-function updateUI() {
-    renderFeedList(els.feedListPreview, 3);
-    renderFeedList(els.feedListFull, 50);
-    updateStats();
-    populateBrandDataList();
-}
+// --- Core Actions ---
+function startFeed() {
+    const now = new Date();
+    const newFeed = {
+        id: Date.now().toString(),
+        timestamp: now.toISOString(),
+        type: 'Left', // Default
+        amount: '',
+        notes: ''
+    };
 
-function renderFeedList(container, limit) {
-    container.innerHTML = '';
-    const list = state.feeds.slice(0, limit);
+    state.feeds.unshift(newFeed); // Add to beginning
+    saveData();
+    renderFeeds();
+    updateTimerDisplay();
     
-    list.forEach(feed => {
-        const date = new Date(feed.start);
-        const li = document.createElement('li');
-        li.className = 'feed-item';
-        li.innerHTML = `
-            <div class="feed-info" onclick="openEditModal(${feed.id})">
-                <h4>${getTypeLabel(feed)}</h4>
-                <p>${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} 
-                   ${feed.end ? '• ' + formatDuration(feed.end - feed.start) : ''}</p>
-            </div>
-            <button class="btn-secondary" onclick="openEditModal(${feed.id})">✎</button>
+    // Random Encouragement
+    els.encouragement.textContent = messages[Math.floor(Math.random() * messages.length)];
+    
+    // Reset alarm state
+    alarmTriggered = false;
+}
+
+// --- Rendering Feeds ---
+function renderFeeds() {
+    // Sort Descending
+    state.feeds.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    const html = state.feeds.map(feed => {
+        const date = new Date(feed.timestamp);
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = date.toLocaleDateString();
+        const info = [feed.type, feed.amount ? `${feed.amount}ml` : null].filter(Boolean).join(' • ');
+
+        return `
+            <li class="feed-item" onclick="openEditModal('${feed.id}')">
+                <div class="feed-info">
+                    <h4>${timeStr} <span style="font-weight:400; opacity:0.7; font-size:0.8em">(${dateStr})</span></h4>
+                    <p>${info} ${feed.notes ? '• 📝' : ''}</p>
+                </div>
+                <button class="feed-edit-btn">Edit</button>
+            </li>
         `;
-        container.appendChild(li);
-    });
+    }).join('');
+
+    els.feedListPreview.innerHTML = html; // Show all in preview for now, or slice(0,5)
+    els.feedListFull.innerHTML = html;
+    
+    renderStats();
 }
 
-function getTypeLabel(feed) {
-    if (feed.type === 'formula') return `Formula (${feed.amount || 0}oz)`;
-    if (feed.type === 'bottle') return `Bottle (${feed.amount || 0}oz)`;
-    return feed.type === 'breast-l' ? 'Left Breast' : 'Right Breast';
-}
+// --- Stats ---
+function renderStats() {
+    if (!state.feeds.length) return;
 
-function updateStats() {
-    const now = new Date().getTime();
+    const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000;
     
-    // Feeds in last 24h
-    const last24 = state.feeds.filter(f => (now - f.start) < oneDay).length;
-    document.getElementById('stat-24h').textContent = last24;
+    // Feeds last 24h
+    const feeds24h = state.feeds.filter(f => (now - new Date(f.timestamp).getTime()) < oneDay);
+    document.getElementById('stat-count-24').textContent = feeds24h.length;
 
-    // Avg Gap
+    // Avg Interval
     if (state.feeds.length > 1) {
-        let totalGap = 0;
-        for (let i = 0; i < Math.min(state.feeds.length - 1, 10); i++) {
-            totalGap += (state.feeds[i].start - state.feeds[i+1].start);
+        let totalDiff = 0;
+        let count = 0;
+        for(let i = 0; i < Math.min(state.feeds.length - 1, 10); i++) {
+            const t1 = new Date(state.feeds[i].timestamp);
+            const t2 = new Date(state.feeds[i+1].timestamp);
+            totalDiff += (t1 - t2);
+            count++;
         }
-        const avgMs = totalGap / Math.min(state.feeds.length - 1, 10);
+        const avgMs = totalDiff / count;
         const avgHrs = (avgMs / (1000 * 60 * 60)).toFixed(1);
-        document.getElementById('stat-avg').textContent = `${avgHrs}h`;
+        document.getElementById('stat-avg-time').textContent = `${avgHrs}h`;
     }
 }
 
-// --- Settings & Event Listeners ---
+// --- Modals & Editing ---
+function openEditModal(id) {
+    const feed = state.feeds.find(f => f.id === id);
+    if (!feed) return;
 
-function setupEventListeners() {
-    // Navigation
-    els.navBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const target = btn.closest('button').dataset.target;
-            els.views.forEach(v => {
-                v.classList.remove('active-view');
-                v.classList.add('hidden-view');
-            });
-            document.getElementById(target).classList.remove('hidden-view');
-            document.getElementById(target).classList.add('active-view');
-            
-            els.navBtns.forEach(b => b.classList.remove('active'));
-            btn.closest('button').classList.add('active');
-        });
-    });
+    els.modal.id.value = feed.id;
+    // Format datetime-local: YYYY-MM-DDThh:mm
+    const d = new Date(feed.timestamp);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    els.modal.time.value = d.toISOString().slice(0,16);
+    
+    els.modal.typeInput.value = feed.type || 'Left';
+    updateChipUI(feed.type || 'Left');
+    els.modal.amount.value = feed.amount || '';
+    els.modal.notes.value = feed.notes || '';
+    
+    els.modal.overlay.classList.remove('hidden');
+}
 
-    document.querySelectorAll('.btn-back').forEach(btn => {
-        btn.addEventListener('click', () => {
-             document.querySelector('[data-target="view-home"]').click();
-        });
-    });
+function closeEditModal() {
+    els.modal.overlay.classList.add('hidden');
+}
 
-    // Timer Mode
-    document.getElementById('btn-mode-countdown').addEventListener('click', () => setMode('countdown'));
-    document.getElementById('btn-mode-stopwatch').addEventListener('click', () => setMode('stopwatch'));
-
-    // Actions
-    els.btnStart.addEventListener('click', startFeed);
-
-    // Settings
-    document.getElementById('theme-blue').addEventListener('click', () => setTheme('blue'));
-    document.getElementById('theme-pink').addEventListener('click', () => setTheme('pink'));
-    document.getElementById('btn-dark-mode').addEventListener('click', toggleDarkMode);
-    document.getElementById('setting-interval').addEventListener('change', (e) => {
-        state.settings.intervalHours = parseFloat(e.target.value);
+function saveEdit() {
+    const id = els.modal.id.value;
+    const idx = state.feeds.findIndex(f => f.id === id);
+    if (idx > -1) {
+        state.feeds[idx] = {
+            ...state.feeds[idx],
+            timestamp: new Date(els.modal.time.value).toISOString(),
+            type: els.modal.typeInput.value,
+            amount: els.modal.amount.value,
+            notes: els.modal.notes.value
+        };
         saveData();
-    });
-    document.getElementById('btn-clear-data').addEventListener('click', () => {
-        if(confirm("Delete all history?")) {
-            state.feeds = [];
-            state.lastFeed = null;
-            saveData();
-            updateUI();
-        }
-    });
-    document.getElementById('btn-export').addEventListener('click', exportData);
-
-    // Modal
-    document.getElementById('btn-cancel-modal').addEventListener('click', closeModal);
-    document.getElementById('feed-type').addEventListener('change', toggleFormulaFields);
-    els.form.addEventListener('submit', saveFeedEdit);
-    document.getElementById('btn-delete-feed').addEventListener('click', deleteFeed);
+        renderFeeds();
+        closeEditModal();
+    }
 }
 
-function setMode(mode) {
-    state.viewMode = mode;
-    els.modeBtns.forEach(b => b.classList.remove('active'));
-    document.getElementById(`btn-mode-${mode}`).classList.add('active');
-    updateTimer();
-}
-
-function setTheme(color) {
-    state.settings.theme = color;
-    applyTheme();
+function deleteEntry() {
+    if(!confirm("Delete this feed?")) return;
+    const id = els.modal.id.value;
+    state.feeds = state.feeds.filter(f => f.id !== id);
     saveData();
+    renderFeeds();
+    closeEditModal();
+}
+
+// --- UI Helpers ---
+function updateChipUI(val) {
+    document.querySelectorAll('.chip').forEach(c => {
+        if(c.dataset.val === val) c.classList.add('selected');
+        else c.classList.remove('selected');
+    });
+    els.modal.typeInput.value = val;
+}
+
+function showView(viewName) {
+    Object.values(els.views).forEach(el => el.classList.add('hidden'));
+    if(viewName === 'home') els.views.home.classList.remove('hidden');
+    if(viewName === 'stats') els.views.stats.classList.remove('hidden');
+    if(viewName === 'settings') els.views.settings.classList.remove('hidden');
 }
 
 function applyTheme() {
     document.body.setAttribute('data-theme', state.settings.theme);
-    document.body.setAttribute('data-mode', state.settings.darkMode ? 'dark' : 'light');
+}
+
+// --- Audio (Web Audio API Synthesis) ---
+// This removes dependency on external MP3 files
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioContext();
+
+function playChime(type) {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
     
-    document.getElementById('theme-blue').classList.toggle('active', state.settings.theme === 'blue');
-    document.getElementById('theme-pink').classList.toggle('active', state.settings.theme === 'pink');
-    document.getElementById('setting-interval').value = state.settings.intervalHours;
-}
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
 
-function toggleDarkMode() {
-    state.settings.darkMode = !state.settings.darkMode;
-    applyTheme();
-    saveData();
-}
-
-// --- Modal & Forms ---
-
-let editingId = null;
-
-window.openEditModal = function(id) {
-    editingId = id;
-    const feed = state.feeds.find(f => f.id === id);
-    if (!feed) return;
-
-    document.getElementById('feed-id').value = feed.id;
-    document.getElementById('feed-start').value = new Date(feed.start - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-    document.getElementById('feed-end').value = feed.end ? new Date(feed.end - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : '';
-    document.getElementById('feed-type').value = feed.type;
-    document.getElementById('feed-amount').value = feed.amount || '';
-    document.getElementById('feed-brand').value = feed.brand || '';
-    document.getElementById('feed-notes').value = feed.notes || '';
-
-    toggleFormulaFields();
-    els.modal.classList.add('open');
-};
-
-function closeModal() {
-    els.modal.classList.remove('open');
-    editingId = null;
-}
-
-function toggleFormulaFields() {
-    const type = document.getElementById('feed-type').value;
-    const show = (type === 'formula' || type === 'bottle');
-    document.getElementById('formula-details').classList.toggle('hidden', !show);
-}
-
-function populateBrandDataList() {
-    const brands = [...new Set(state.feeds.filter(f => f.brand).map(f => f.brand))];
-    const dataList = document.getElementById('brand-list');
-    dataList.innerHTML = brands.map(b => `<option value="${b}">`).join('');
-}
-
-function saveFeedEdit(e) {
-    e.preventDefault();
-    if (!editingId) return;
-
-    const feedIndex = state.feeds.findIndex(f => f.id === editingId);
-    if (feedIndex === -1) return;
-
-    const formData = {
-        start: new Date(document.getElementById('feed-start').value).getTime(),
-        end: document.getElementById('feed-end').value ? new Date(document.getElementById('feed-end').value).getTime() : null,
-        type: document.getElementById('feed-type').value,
-        amount: document.getElementById('feed-amount').value,
-        brand: document.getElementById('feed-brand').value,
-        notes: document.getElementById('feed-notes').value
-    };
-
-    state.feeds[feedIndex] = { ...state.feeds[feedIndex], ...formData };
+    const now = audioCtx.currentTime;
     
-    // If we edited the most recent feed, update the global timer
-    if (feedIndex === 0) state.lastFeed = formData.start;
-
-    // Re-sort feeds in case date changed
-    state.feeds.sort((a, b) => b.start - a.start);
-    
-    saveData();
-    closeModal();
+    if (type === 'chime1') {
+        // Soft sine wave
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.5);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+        osc.start(now);
+        osc.stop(now + 1.5);
+    } else if (type === 'chime2') {
+        // Bell-like triangle
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(600, now);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 2);
+        osc.start(now);
+        osc.stop(now + 2);
+    } else {
+        // Harp-ish
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.linearRampToValueAtTime(500, now + 0.1);
+        osc.frequency.linearRampToValueAtTime(800, now + 0.2);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 3);
+        osc.start(now);
+        osc.stop(now + 3);
+    }
 }
 
-function deleteFeed() {
-    if (!editingId || !confirm("Delete this entry?")) return;
-    state.feeds = state.feeds.filter(f => f.id !== editingId);
-    if (state.feeds.length > 0) state.lastFeed = state.feeds[0].start;
-    else state.lastFeed = null;
-    
-    saveData();
-    closeModal();
-}
-
-// --- Notifications & Export ---
-
+// --- Notifications ---
 function requestNotificationPermission() {
     if ("Notification" in window && Notification.permission !== "granted") {
         Notification.requestPermission();
     }
 }
 
-function scheduleNotification() {
+function sendNotification() {
     if (Notification.permission === "granted") {
-        const intervalMs = state.settings.intervalHours * 60 * 60 * 1000;
-        // Note: This simple timeout only works if app is open/backgrounded on Desktop/Android.
-        // iOS puts aggressive limits on background timers.
-        // A robust PWA solution for iOS usually requires Push API (Server-side).
-        // We implement best-effort local notification here.
-        setTimeout(() => {
-            new Notification("Feeding Time!", {
-                body: "It's been " + state.settings.intervalHours + " hours since the last feed.",
-                icon: "icons/icon-192.png"
-            });
-        }, intervalMs);
+        const intervalHr = (state.settings.intervalMinutes / 60).toFixed(1);
+        new Notification("Time to Feed!", {
+            body: `${intervalHr} hours have passed since the last feed.`,
+            icon: 'icons/icon-192.png'
+        });
     }
 }
 
-function exportData() {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.feeds, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "feeding_log.json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
+// --- Event Listeners ---
+function setupEventListeners() {
+    // Toggles
+    els.toggleCountdown.onclick = () => {
+        state.viewMode = 'countdown';
+        els.toggleCountdown.classList.add('active');
+        els.toggleStopwatch.classList.remove('active');
+        updateTimerDisplay();
+    };
+    els.toggleStopwatch.onclick = () => {
+        state.viewMode = 'stopwatch';
+        els.toggleStopwatch.classList.add('active');
+        els.toggleCountdown.classList.remove('active');
+        updateTimerDisplay();
+    };
+
+    // Buttons
+    els.startBtn.onclick = startFeed;
+    els.btnSettings.onclick = () => showView('settings');
+    els.btnStats.onclick = () => showView('stats');
+    
+    // Modal actions
+    els.modal.saveBtn.onclick = saveEdit;
+    els.modal.delBtn.onclick = deleteEntry;
+    els.modal.typeGroup.addEventListener('click', (e) => {
+        if(e.target.classList.contains('chip')) updateChipUI(e.target.dataset.val);
+    });
+
+    // Settings inputs
+    els.inputs.theme.onchange = (e) => {
+        state.settings.theme = e.target.value;
+        applyTheme();
+        saveData();
+    };
+    els.inputs.interval.onchange = (e) => {
+        state.settings.intervalMinutes = parseInt(e.target.value);
+        saveData();
+        updateTimerDisplay();
+    };
+    els.inputs.sound.onchange = (e) => {
+        state.settings.sound = e.target.value;
+        saveData();
+    };
+    document.getElementById('btn-test-sound').onclick = () => playChime(state.settings.sound);
+    document.getElementById('btn-clear-data').onclick = () => {
+        if(confirm("Delete ALL history? This cannot be undone.")) {
+            state.feeds = [];
+            saveData();
+            renderFeeds();
+        }
+    };
+    document.getElementById('btn-export').onclick = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.feeds));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "feed_history.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    };
 }
+
+// Init App
+document.addEventListener('DOMContentLoaded', init);
